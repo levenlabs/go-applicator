@@ -7,7 +7,7 @@ import (
 
 type function func(interface{}, string) (interface{}, error)
 
-// Applicator is an instance of
+// Applicator is an instance of defined functions to run on fields in a struct
 type Applicator struct {
 	TagName string
 	funcs map[string]function
@@ -16,6 +16,7 @@ type Applicator struct {
 var defaultApplicator = New()
 
 // New returns an instance of Applicator with the builtin functions added
+// The default TagName is apply
 func New() *Applicator {
 	return &Applicator{
 		TagName: "apply",
@@ -26,7 +27,8 @@ func New() *Applicator {
 	}
 }
 
-// Runs all the functions on the struct's fields. Must receive a pointer
+// Apply runs all the functions on the struct's fields based on their tags.
+// Must receive a struct pointer
 func (h *Applicator) Apply(s interface{}) error {
 	el := reflect.TypeOf(s)
 	val := reflect.ValueOf(s)
@@ -72,7 +74,9 @@ func (h *Applicator) Apply(s interface{}) error {
 	return nil
 }
 
-// Adds a new function
+// AddFunc adds a new function to this Applicator for the given name
+// the function must have the definition:
+// `func(interface{}, string) (interface{}, error)`
 func (h *Applicator) AddFunc(name string, f function) {
 	h.funcs[name] = f
 }
