@@ -1,4 +1,4 @@
-package helper
+package applicator
 
 import (
 	"reflect"
@@ -13,11 +13,11 @@ func TestWrongType(t *T) {
 		return interface{}(""), nil
 	})
 	s := &struct {
-		A uint `helper:"wrongtype"`
+		A uint `apply:"wrongtype"`
 	}{
 		A: 1,
 	}
-	err := Run(s)
+	err := Apply(s)
 	assert.Equal(t, ErrInvalidSet, err)
 }
 
@@ -28,21 +28,21 @@ func TestDiffUintBytes(t *T) {
 		return interface{}(uint64(v.Uint())), nil
 	})
 	s := &struct {
-		A uint `helper:"diffuintbytes"`
+		A uint `apply:"diffuintbytes"`
 	}{
 		A: 1,
 	}
-	err := Run(s)
+	err := Apply(s)
 	assert.Equal(t, ErrInvalidSet, err)
 }
 
 func TestMultiple(t *T) {
 	s := &struct {
-		A string `helper:"trim,lower"`
+		A string `apply:"trim,lower"`
 	}{
 		A: " ABC ",
 	}
-	err := Run(s)
+	err := Apply(s)
 	require.Nil(t, err)
 	assert.Equal(t, "abc", s.A)
 }

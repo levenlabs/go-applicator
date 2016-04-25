@@ -1,4 +1,4 @@
-package helper
+package applicator
 
 import (
 	"reflect"
@@ -7,16 +7,18 @@ import (
 
 type function func(interface{}, string) (interface{}, error)
 
-// Helper is an instance of
-type Helper struct {
+// Applicator is an instance of
+type Applicator struct {
+	TagName string
 	funcs map[string]function
 }
 
-var defaultHelper = NewHelper()
+var defaultApplicator = New()
 
-// Returns a new instance of Helper with the builtin helpers added
-func NewHelper() *Helper {
-	return &Helper{
+// New returns an instance of Applicator with the builtin functions added
+func New() *Applicator {
+	return &Applicator{
+		TagName: "apply",
 		funcs: map[string]function{
 			"trim":  trim,
 			"lower": lower,
@@ -24,8 +26,8 @@ func NewHelper() *Helper {
 	}
 }
 
-// Runs all the helpers on the struct's fields. Must receive a pointer
-func (h *Helper) Run(s interface{}) error {
+// Runs all the functions on the struct's fields. Must receive a pointer
+func (h *Applicator) Apply(s interface{}) error {
 	el := reflect.TypeOf(s)
 	val := reflect.ValueOf(s)
 	if val.Kind() != reflect.Ptr || val.IsNil() {
@@ -39,7 +41,7 @@ func (h *Helper) Run(s interface{}) error {
 	for i := 0; i < val.NumField(); i++ {
 		fVal := val.Field(i)
 		fEl := el.Field(i)
-		fn := strings.Split(fEl.Tag.Get("helper"), ",")
+		fn := strings.Split(fEl.Tag.Get(h.TagName), ",")
 		if !fVal.CanSet() || fn[0] == "" || fn[0] == "-" {
 			continue
 		}
@@ -70,17 +72,17 @@ func (h *Helper) Run(s interface{}) error {
 	return nil
 }
 
-// Adds a new helper function
-func (h *Helper) AddFunc(name string, f function) {
+// Adds a new function
+func (h *Applicator) AddFunc(name string, f function) {
 	h.funcs[name] = f
 }
 
-// Runs the default helper
-func Run(s interface{}) error {
-	return defaultHelper.Run(s)
+// Apply calls Apply on the default Applicator
+func Apply(s interface{}) error {
+	return defaultApplicator.Apply(s)
 }
 
-// Adds a new helper function to the default helper
+// AddFunc calls AddFunc on the default Applicator
 func AddFunc(name string, f function) {
-	defaultHelper.AddFunc(name, f)
+	defaultApplicator.AddFunc(name, f)
 }
