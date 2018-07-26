@@ -10,7 +10,7 @@ type function func(interface{}, string) (interface{}, error)
 // Applicator is an instance of defined functions to run on fields in a struct
 type Applicator struct {
 	TagName string
-	funcs map[string]function
+	funcs   map[string]function
 }
 
 var defaultApplicator = New()
@@ -44,7 +44,23 @@ func (h *Applicator) Apply(s interface{}) error {
 		fVal := val.Field(i)
 		fEl := el.Field(i)
 		fn := strings.Split(fEl.Tag.Get(h.TagName), ",")
-		if !fVal.CanSet() || fn[0] == "" || fn[0] == "-" {
+		if !fVal.CanSet() || fn[0] == "-" {
+			continue
+		}
+		// if the field is a struct, run the applications on that struct's field
+		// but continue if there was no errors in case there are applications on
+		// the struct itself
+		if fVal.Kind() == reflect.Ptr && !fVal.IsNil() && fVal.Elem().Kind() == reflect.Struct {
+			if err := h.Apply(fVal.Interface()); err != nil {
+				return err
+			}
+		} else if fVal.Kind() == reflect.Struct {
+			// we need to get a pointer to the struct
+			if err := h.Apply(fVal.Addr().Interface()); err != nil {
+				return err
+			}
+		}
+		if fn[0] == "" {
 			continue
 		}
 		val := fVal.Interface()
