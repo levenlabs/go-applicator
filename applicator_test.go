@@ -43,6 +43,29 @@ func TestMultiple(t *T) {
 		A: " ABC ",
 	}
 	err := Apply(s)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "abc", s.A)
+}
+
+func TestEmbedded(t *T) {
+	type Inner struct {
+		A string `apply:"lower"`
+	}
+	s := &struct {
+		Inner
+	}{
+		Inner{"ABC"},
+	}
+	err := Apply(s)
+	require.NoError(t, err)
+	assert.Equal(t, "abc", s.A)
+
+	s2 := &struct {
+		*Inner
+	}{
+		&Inner{"ABC"},
+	}
+	err = Apply(s2)
+	require.NoError(t, err)
+	assert.Equal(t, "abc", s2.A)
 }
