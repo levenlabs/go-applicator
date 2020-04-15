@@ -34,12 +34,12 @@ func (h *Applicator) Apply(s interface{}) error {
 	el := reflect.TypeOf(s)
 	val := reflect.ValueOf(s)
 	if val.Kind() != reflect.Ptr || val.IsNil() {
-		return ErrUnsupported
+		return ErrCannotApply
 	}
 	el = el.Elem()
 	val = val.Elem()
 	if val.Kind() != reflect.Struct {
-		return ErrUnsupported
+		return ErrCannotApply
 	}
 	for i := 0; i < val.NumField(); i++ {
 		fVal := val.Field(i)
