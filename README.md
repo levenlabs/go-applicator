@@ -28,3 +28,6 @@ Builtin functions
 
     lower
             Calls strings.ToLower on the string
+
+    fillNil
+            Ensures that the field is not nil by filling it with the default value
