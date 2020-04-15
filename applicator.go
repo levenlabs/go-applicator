@@ -21,8 +21,9 @@ func New() *Applicator {
 	return &Applicator{
 		TagName: "apply",
 		funcs: map[string]function{
-			"trim":  trim,
-			"lower": lower,
+			"trim":   trim,
+			"lower":  lower,
+			"fillNil": fillNil,
 		},
 	}
 }
