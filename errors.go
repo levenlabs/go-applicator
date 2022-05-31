@@ -15,5 +15,5 @@ var ErrNotFound = errors.New("applicator name not found")
 // match the field type.
 var ErrInvalidSet = errors.New("cannot set new value with unmatching type")
 
-// ErrCannotApply is returned when you call Apply on a non-struct pointer.
+// ErrCannotApply is returned when you call Apply on an incompatible type.
 var ErrCannotApply = errors.New("cannot apply to invalid type")
