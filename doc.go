@@ -27,5 +27,8 @@ Builtin functions
     lower
             Calls strings.ToLower on the string
 
+    fillNil
+            Sets the pointer to the zero value, if nil
+
 */
 package applicator
