@@ -2,13 +2,13 @@ package applicator
 
 import (
 	"reflect"
-	. "testing"
+	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestStruct(t *T) {
+func TestStruct(t *testing.T) {
 	type B struct {
 		A string `apply:"trim"`
 	}
@@ -19,9 +19,21 @@ func TestStruct(t *T) {
 
 	err = Apply(s)
 	assert.Equal(t, ErrCannotApply, err)
+
+	s = B{" abc"}
+	ptr := &s
+	err = Apply(ptr)
+	require.NoError(t, err)
+	assert.Equal(t, "abc", s.A)
+
+	s = B{" abc"}
+	ptr = &s
+	err = Apply(&ptr)
+	require.NoError(t, err)
+	assert.Equal(t, "abc", s.A)
 }
 
-func TestStructInterface(t *T) {
+func TestStructInterface(t *testing.T) {
 	type B struct {
 		A string `apply:"trim"`
 	}
@@ -30,14 +42,41 @@ func TestStructInterface(t *T) {
 	err := Apply(i)
 	require.NoError(t, err)
 	assert.Equal(t, "abc", s.A)
+	assert.Equal(t, &s, i.(*B))
+
+	s = B{" abc"}
+	i = &s
+	err = Apply(&i)
+	require.NoError(t, err)
+	assert.Equal(t, "abc", s.A)
 
 	s = B{" abc"}
 	i = s
 	err = Apply(i)
 	assert.Equal(t, ErrCannotApply, err)
+
+	s = B{" abc"}
+	i = s
+	err = Apply(&i)
+	require.NoError(t, err)
+	assert.Equal(t, "abc", i.(B).A)
+
+	s = B{" abc"}
+	i = s
+	var ii interface{} = &i
+	err = Apply(ii)
+	require.NoError(t, err)
+	assert.Equal(t, "abc", i.(B).A)
+
+	s = B{" abc"}
+	i = s
+	ii = &i
+	err = Apply(&ii)
+	require.NoError(t, err)
+	assert.Equal(t, "abc", i.(B).A)
 }
 
-func TestWrongType(t *T) {
+func TestWrongType(t *testing.T) {
 	AddFunc("wrongtype", func(i interface{}, _ string) (interface{}, error) {
 		return interface{}(""), nil
 	})
@@ -50,7 +89,7 @@ func TestWrongType(t *T) {
 	assert.Equal(t, ErrInvalidSet, err)
 }
 
-func TestDiffUintBytes(t *T) {
+func TestDiffUintBytes(t *testing.T) {
 	AddFunc("diffuintbytes", func(i interface{}, _ string) (interface{}, error) {
 		v := reflect.ValueOf(i)
 
@@ -65,7 +104,7 @@ func TestDiffUintBytes(t *T) {
 	assert.Equal(t, ErrInvalidSet, err)
 }
 
-func TestMultiple(t *T) {
+func TestMultiple(t *testing.T) {
 	s := &struct {
 		A string `apply:"trim,lower"`
 	}{
@@ -76,7 +115,7 @@ func TestMultiple(t *T) {
 	assert.Equal(t, "abc", s.A)
 }
 
-func TestEmbedded(t *T) {
+func TestEmbedded(t *testing.T) {
 	type Inner struct {
 		A string `apply:"lower"`
 	}
@@ -99,7 +138,7 @@ func TestEmbedded(t *T) {
 	assert.Equal(t, "abc", s2.A)
 }
 
-func TestStructInStruct(t *T) {
+func TestStructInStruct(t *testing.T) {
 	type B struct {
 		A string `apply:"trim,lower"`
 	}
@@ -115,7 +154,7 @@ func TestStructInStruct(t *T) {
 	assert.Equal(t, "abc", s.B.A)
 }
 
-func TestSliceInStruct(t *T) {
+func TestSliceInStruct(t *testing.T) {
 	type B struct {
 		A string `apply:"trim,lower"`
 	}
@@ -133,7 +172,7 @@ func TestSliceInStruct(t *T) {
 	assert.Equal(t, "abc", s.B[0].A)
 }
 
-func TestSlice(t *T) {
+func TestSlice(t *testing.T) {
 	type A struct {
 		S string `apply:"trim,lower"`
 	}
@@ -165,9 +204,33 @@ func TestSlice(t *T) {
 		require.NoError(t, err)
 		assert.Equal(t, []interface{}{&A{"abc"}, &A{"abc"}}, s)
 	}
+
+	{
+		s := []interface{}{&A{" abc "}, &A{"ABC"}}
+		var i interface{} = s
+		err := Apply(i)
+		require.NoError(t, err)
+		assert.Equal(t, []interface{}{&A{"abc"}, &A{"abc"}}, s)
+	}
+
+	{
+		s := []interface{}{&A{" abc "}, &A{"ABC"}}
+		var i interface{} = s
+		err := Apply(&i)
+		require.NoError(t, err)
+		assert.Equal(t, []interface{}{&A{"abc"}, &A{"abc"}}, s)
+	}
+
+	{
+		s := []interface{}{&A{" abc "}, &A{"ABC"}}
+		var i interface{} = &s
+		err := Apply(i)
+		require.NoError(t, err)
+		assert.Equal(t, []interface{}{&A{"abc"}, &A{"abc"}}, s)
+	}
 }
 
-func TestArray(t *T) {
+func TestArray(t *testing.T) {
 	type A struct {
 		S string `apply:"trim,lower"`
 	}
@@ -198,9 +261,25 @@ func TestArray(t *T) {
 		require.NoError(t, err)
 		assert.Equal(t, [2]interface{}{&A{"abc"}, &A{"abc"}}, s)
 	}
+
+	{
+		s := [2]A{{" abc "}, {"ABC"}}
+		var i interface{} = &s
+		err := Apply(i)
+		require.NoError(t, err)
+		assert.Equal(t, [2]A{{"abc"}, {"abc"}}, s)
+	}
+
+	{
+		s := [2]A{{" abc "}, {"ABC"}}
+		var i interface{} = s
+		err := Apply(&i)
+		require.NoError(t, err)
+		assert.Equal(t, [2]A{{"abc"}, {"abc"}}, i.([2]A))
+	}
 }
 
-func TestMap(t *T) {
+func TestMap(t *testing.T) {
 	type A struct {
 		S string `apply:"trim,lower"`
 	}
@@ -248,4 +327,76 @@ func TestMap(t *T) {
 			2: &A{"abc"},
 		}, s)
 	}
+
+	{
+		s := map[int]interface{}{
+			1: &A{" abc "},
+			2: &A{"ABC"},
+		}
+		var i interface{} = s
+		err := Apply(i)
+		require.NoError(t, err)
+		assert.Equal(t, map[int]interface{}{
+			1: &A{"abc"},
+			2: &A{"abc"},
+		}, s)
+	}
+
+	{
+		s := map[int]interface{}{
+			1: &A{" abc "},
+			2: &A{"ABC"},
+		}
+		var i interface{} = s
+		err := Apply(&i)
+		require.NoError(t, err)
+		assert.Equal(t, map[int]interface{}{
+			1: &A{"abc"},
+			2: &A{"abc"},
+		}, s)
+	}
+
+	{
+		s := map[int]interface{}{
+			1: &A{" abc "},
+			2: &A{"ABC"},
+		}
+		var i interface{} = &s
+		err := Apply(i)
+		require.NoError(t, err)
+		assert.Equal(t, map[int]interface{}{
+			1: &A{"abc"},
+			2: &A{"abc"},
+		}, s)
+	}
+}
+
+func TestString(t *testing.T) {
+	s := " abc"
+	err := Apply(&s)
+	assert.Equal(t, ErrCannotApply, err)
+
+	err = Apply(s)
+	assert.Equal(t, ErrCannotApply, err)
+
+	var i interface{} = &s
+	err = Apply(i)
+	assert.Equal(t, ErrCannotApply, err)
+
+	i = &s
+	err = Apply(&i)
+	assert.Equal(t, ErrCannotApply, err)
+
+	i = s
+	err = Apply(&i)
+	assert.Equal(t, ErrCannotApply, err)
+}
+
+func TestNilInterface(t *testing.T) {
+	var i interface{}
+	err := Apply(i)
+	assert.Equal(t, ErrCannotApply, err)
+
+	err = Apply(&i)
+	assert.Equal(t, ErrCannotApply, err)
 }
