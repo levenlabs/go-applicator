@@ -1,13 +1,13 @@
 package applicator
 
 import (
-	. "testing"
+	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestTrim(t *T) {
+func TestTrim(t *testing.T) {
 	s := &struct {
 		A string `apply:"trim"`
 	}{
@@ -35,7 +35,7 @@ func TestTrim(t *T) {
 	assert.Nil(t, s3.A)
 }
 
-func TestLower(t *T) {
+func TestLower(t *testing.T) {
 	s := &struct {
 		A string `apply:"lower"`
 	}{
@@ -63,7 +63,7 @@ func TestLower(t *T) {
 	assert.Nil(t, s3.A)
 }
 
-func TestNonNil(t *T) {
+func TestNonNil(t *testing.T) {
 	s := &struct {
 		A []string `apply:"fillNil"`
 	}{}

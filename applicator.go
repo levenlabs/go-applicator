@@ -44,23 +44,43 @@ func canApply(typ reflect.Type) bool {
 // to any of the previous types.
 func (h *Applicator) Apply(s interface{}) error {
 	val := reflect.ValueOf(s)
-	typ := val.Type()
-	lastPtr := val
+	if val.Kind() == reflect.Invalid {
+		return ErrCannotApply
+	}
+	var lastPtr reflect.Value
+	var typ reflect.Type
 	for {
-		if val.Kind() == reflect.Ptr || val.Kind() == reflect.Interface {
+		if val.Kind() == reflect.Invalid {
+			return ErrCannotApply
+		}
+		typ = val.Type()
+
+		if val.Kind() == reflect.Ptr {
 			if val.IsNil() {
 				return ErrCannotApply
 			}
 			lastPtr = val
 			val = val.Elem()
-			typ = val.Type()
+		} else if val.Kind() == reflect.Interface {
+			if val.IsNil() {
+				return ErrCannotApply
+			}
+			val = val.Elem()
 		} else {
 			break
 		}
 	}
 	switch typ.Kind() {
 	case reflect.Struct:
-		return h.applyStruct(lastPtr)
+		// if we didn't get a pointer at all then we can't apply
+		if !lastPtr.IsValid() {
+			return ErrCannotApply
+		}
+		val, err := h.applyStruct(val)
+		if err != nil {
+			return err
+		}
+		lastPtr.Elem().Set(val)
 	case reflect.Slice:
 		// make sure its a slice of compatible types
 		if !canApply(typ.Elem()) {
@@ -87,14 +107,31 @@ func (h *Applicator) Apply(s interface{}) error {
 		if !canApply(typ.Elem()) {
 			return ErrCannotApply
 		}
+		// if we have an array of structs/arrays then we need a pointer to the array
+		// otherwise we can't get the address
+		// but if we have an array of interface{} then we don't know what to expect
+		// but we should try to address them
+		var shouldAddr bool
+		var resetArray bool
+		switch typ.Elem().Kind() {
+		case reflect.Struct, reflect.Array:
+			if !lastPtr.IsValid() {
+				return ErrCannotApply
+			}
+			shouldAddr = true
+			if !val.CanAddr() {
+				resetArray = true
+				ptr := reflect.New(val.Type())
+				ptr.Elem().Set(val)
+				val = ptr.Elem()
+			}
+		case reflect.Interface:
+			shouldAddr = true
+		}
 		for i := 0; i < val.Len(); i++ {
 			f := val.Index(i)
 			if f.CanInterface() {
-				if f.Kind() == reflect.Struct {
-					// this means we didn't get an addressable Array passed
-					if !f.CanAddr() {
-						return ErrCannotApply
-					}
+				if shouldAddr && f.CanAddr() {
 					f = f.Addr()
 				}
 				if err := h.Apply(f.Interface()); err != nil {
@@ -106,6 +143,9 @@ func (h *Applicator) Apply(s interface{}) error {
 					return err
 				}
 			}
+		}
+		if resetArray {
+			lastPtr.Elem().Set(val)
 		}
 	case reflect.Map:
 		// make sure its a map of compatible types
@@ -138,40 +178,41 @@ func (h *Applicator) Apply(s interface{}) error {
 	return nil
 }
 
-func (h *Applicator) applyStruct(val reflect.Value) error {
-	if val.Kind() != reflect.Ptr || val.IsNil() {
-		return ErrCannotApply
+func (h *Applicator) applyStruct(strct reflect.Value) (reflect.Value, error) {
+	if strct.Kind() != reflect.Struct {
+		return strct, ErrCannotApply
 	}
-	val = val.Elem()
-	if val.Kind() != reflect.Struct {
-		return ErrCannotApply
+	if !strct.CanAddr() {
+		ptr := reflect.New(strct.Type())
+		ptr.Elem().Set(strct)
+		strct = ptr.Elem()
 	}
-	typ := val.Type()
-	for i := 0; i < val.NumField(); i++ {
-		fVal := val.Field(i)
+	typ := strct.Type()
+	for i := 0; i < strct.NumField(); i++ {
+		f := strct.Field(i)
 		fn := strings.Split(typ.Field(i).Tag.Get(h.TagName), ",")
-		if !fVal.CanSet() || fn[0] == "-" {
+		if !f.CanSet() || fn[0] == "-" {
 			continue
 		}
 		// if the field is a struct/slice/map/etc, run the applications on that
 		// struct's field but continue if there was no errors in case there are
 		// applications on the struct itself
 		// we ignore ErrCannotApply since this is purely opportunistic
-		if canApply(fVal.Type()) && fVal.CanInterface() {
-			if fVal.CanAddr() && fVal.Kind() == reflect.Struct {
-				if err := h.Apply(fVal.Addr().Interface()); err != nil && err != ErrCannotApply {
-					return err
+		if canApply(f.Type()) && f.CanInterface() {
+			if f.CanAddr() && f.Kind() == reflect.Struct {
+				if err := h.Apply(f.Addr().Interface()); err != nil && err != ErrCannotApply {
+					return strct, err
 				}
 			} else {
-				if err := h.Apply(fVal.Interface()); err != nil && err != ErrCannotApply {
-					return err
+				if err := h.Apply(f.Interface()); err != nil && err != ErrCannotApply {
+					return strct, err
 				}
 			}
 		}
 		if fn[0] == "" {
 			continue
 		}
-		val := fVal.Interface()
+		fi := f.Interface()
 		var err error
 		for _, n := range fn {
 			np := strings.SplitN(n, "=", 2)
@@ -180,22 +221,22 @@ func (h *Applicator) applyStruct(val reflect.Value) error {
 				no = np[1]
 				n = np[0]
 			}
-			f, ok := h.funcs[n]
+			fn, ok := h.funcs[n]
 			if !ok {
-				return ErrNotFound
+				return strct, ErrNotFound
 			}
 
-			val, err = f(val, no)
+			fi, err = fn(fi, no)
 			if err != nil {
-				return err
+				return strct, err
 			}
 		}
-		if reflect.TypeOf(val) != fVal.Type() {
-			return ErrInvalidSet
+		if reflect.TypeOf(fi) != f.Type() {
+			return strct, ErrInvalidSet
 		}
-		fVal.Set(reflect.ValueOf(val))
+		f.Set(reflect.ValueOf(fi))
 	}
-	return nil
+	return strct, nil
 }
 
 // AddFunc adds a new function to this Applicator for the given name
